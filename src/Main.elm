@@ -1,5 +1,6 @@
 port module Main exposing (..)
 
+import Common exposing (..)
 import Html exposing (..)
 import Page1 exposing (..)
 import Page2 exposing (..)
@@ -20,13 +21,16 @@ main =
 
 
 type alias Model =
-    { page : Page
+    { user : User
+    , page : Page
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { page = Blank }
+    ( { user = Guest
+      , page = Blank
+      }
     , Cmd.none
     )
 
@@ -107,7 +111,7 @@ view model =
                 |> Html.map Page1Msg
 
         Page2 sub ->
-            Page2.view sub
+            Page2.view model sub
                 |> Html.map Page2Msg
 
 
