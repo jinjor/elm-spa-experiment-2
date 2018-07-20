@@ -23,13 +23,15 @@ main =
 type alias Model =
     { user : User
     , page : Page
+    , error : Maybe Error
     }
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { user = Guest
+    ( { user = Admin
       , page = Blank
+      , error = Nothing
       }
     , Cmd.none
     )
@@ -48,6 +50,7 @@ type Page
 
 type Msg
     = HashChanged String
+    | GotError Error
     | Page1Msg Page1.Msg
     | Page2Msg Page2.Msg
 
@@ -79,6 +82,11 @@ update msg model =
                         }
                     )
 
+        ( GotError error, _ ) ->
+            ( { model | error = Just error }
+            , Cmd.none
+            )
+
         ( Page1Msg msg, Page1 sub ) ->
             Page1.update msg sub
                 |> Tuple.mapFirst (\sub -> { model | page = Page1 sub })
@@ -86,8 +94,10 @@ update msg model =
 
         ( Page2Msg msg, Page2 sub ) ->
             Page2.update msg sub
-                |> Tuple.mapFirst (\sub -> { model | page = Page2 sub })
-                |> Tuple.mapSecond (Cmd.map Page2Msg)
+                |> toTuple
+                    (\sub -> { model | page = Page2 sub })
+                    GotError
+                    Page2Msg
 
         _ ->
             ( model, Cmd.none )
@@ -99,20 +109,25 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    case model.page of
-        Blank ->
-            text ""
+    case model.error of
+        Just err ->
+            text err
 
-        NotFound ->
-            text "not found"
+        Nothing ->
+            case model.page of
+                Blank ->
+                    text ""
 
-        Page1 sub ->
-            Page1.view sub
-                |> Html.map Page1Msg
+                NotFound ->
+                    text "not found"
 
-        Page2 sub ->
-            Page2.view model sub
-                |> Html.map Page2Msg
+                Page1 sub ->
+                    Page1.view sub
+                        |> Html.map Page1Msg
+
+                Page2 sub ->
+                    Page2.view model sub
+                        |> Html.map Page2Msg
 
 
 

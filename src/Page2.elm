@@ -4,6 +4,7 @@ import Common exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Task
 
 
 
@@ -26,13 +27,18 @@ init =
 
 type Msg
     = Change String
+    | GotData ()
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> Return Model Msg
 update msg model =
     case msg of
         Change newContent ->
-            ( { model | content = newContent }, Cmd.none )
+            return { model | content = newContent }
+                |> withTask (Task.map GotData badRequest)
+
+        GotData _ ->
+            return model
 
 
 
