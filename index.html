@@ -1,0 +1,24 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<title>Main</title>
+	<style>html,head,body { padding:0; margin:0; }
+	body { font-family: calibri, helvetica, arial, sans-serif; }
+	</style>
+</head>
+<body>
+<a href="#page1">Counter</a>
+<a href="#page2">Text Field</a>
+<div id="page"></div>
+<script src="./elm.js"></script>
+<script type="text/javascript">
+	const app = Elm.Main.embed(document.getElementById('page'));
+	window.onhashchange = sendHash;
+	setTimeout(sendHash);
+	function sendHash() {
+		app.ports.hashchanges.send(location.hash);
+	}
+</script>
+</body>
+</html>
