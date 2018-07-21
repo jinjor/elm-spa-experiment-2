@@ -1,8 +1,11 @@
 {
   "devDependencies": {
-    "elm": "^0.18.0"
+    "elm": "^0.18.0",
+    "watch": "^1.0.2"
   },
   "scripts": {
-    "build": "elm make src/Main.elm --warn --output=elm.js"
-  }
+    "build": "elm make src/Main.elm --debug --warn --output=elm.js",
+    "start": "watch 'npm run build --silent' src"
+  },
+  "dependencies": {}
 }

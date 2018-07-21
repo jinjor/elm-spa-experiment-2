@@ -12,29 +12,17 @@
 <script src="./elm.js"></script>
 <script type="text/javascript">
 	const app = Elm.Main.embed(document.getElementById('page'), {
-		hash: location.hash,
-		token: localStorage.getItem("token")
+		session: localStorage.getItem("session")
 	});
-	window.onhashchange = sendHash;
-	setTimeout(sendHash);
-	function sendHash() {
-		const token = localStorage.getItem("token");
-		app.ports.hashchanges.send([location.hash, token]);
-	}
-	app.ports.goto.subscribe(hash => {
-		location.hash = hash;
-		sendHash();
+	app.ports.setSession.subscribe(session => {
+		localStorage.setItem("session", session);
+		app.ports.sessionChanges.send(session);
 	});
-	app.ports.login.subscribe(token => {
-		localStorage.setItem("token", token);
-		location.hash = "";
-		sendHash();
-	});
-	app.ports.logout.subscribe(() => {
-		localStorage.removeItem("token");
-		location.hash = "";
-		sendHash();
-	});
+	window.addEventListener("storage", event => {
+		if (event.storageArea === localStorage && event.key === "session") {
+			app.ports.sessionChanges.send(event.newValue);
+		}
+	}, false);
 </script>
 </body>
 </html>

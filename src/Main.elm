@@ -3,16 +3,20 @@ module Main exposing (..)
 import Common exposing (..)
 import Header
 import Html exposing (..)
+import Json.Decode
 import Menu
+import Navigation exposing (Location)
 import Page1 exposing (..)
 import Page2 exposing (..)
+import Route exposing (Route)
 import Template
 import Top
 
 
 main : Program Flags Model Msg
 main =
-    Html.programWithFlags
+    Navigation.programWithFlags
+        (Route.fromLocation >> NewRoute)
         { init = init
         , view = view
         , update = update
@@ -21,8 +25,7 @@ main =
 
 
 type alias Flags =
-    { hash : String
-    , token : Maybe String
+    { session : Json
     }
 
 
@@ -31,30 +34,42 @@ type alias Flags =
 
 
 type alias Model =
-    { user : User
+    { route : Maybe Route
+    , user : User
     , page : Page
     , error : Maybe Error
     }
 
 
-init : Flags -> ( Model, Cmd Msg )
-init { hash, token } =
+init : Flags -> Location -> ( Model, Cmd Msg )
+init flags location =
     let
-        user =
-            if token == Nothing then
-                Guest
+        route =
+            Route.fromLocation location
 
-            else
-                Admin
+        ( user, cmd ) =
+            case Json.Decode.decodeValue decodeSession flags.session of
+                Ok session ->
+                    ( if session.token == Nothing then
+                        Guest
+
+                      else
+                        Admin
+                    , Cmd.none
+                    )
+
+                Err _ ->
+                    ( Guest, logout )
 
         page =
-            initPage hash user
+            initPage route user
     in
-    ( { page = page
+    ( { route = route
+      , page = page
       , user = user
       , error = Nothing
       }
-    , Cmd.none
+    , cmd
     )
 
 
@@ -75,7 +90,8 @@ type MainPage
 
 
 type Msg
-    = HashChanged ( String, Maybe String )
+    = NewRoute (Maybe Route)
+    | SessionChanged Json
     | GotError Error
     | Logout
     | TopMsg Top.Msg
@@ -86,29 +102,40 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.page ) of
-        ( HashChanged ( hash, token ), _ ) ->
-            let
-                user =
-                    if token == Nothing then
-                        Guest
-
-                    else
-                        Admin
-
-                page =
-                    initPage hash user
-            in
+        ( NewRoute route, _ ) ->
             ( { model
-                | page = page
-                , user = user
+                | route = route
+                , page = initPage route model.user
                 , error = Nothing
               }
             , Cmd.none
             )
 
+        ( SessionChanged json, _ ) ->
+            case Json.Decode.decodeValue decodeSession json of
+                Ok session ->
+                    let
+                        user =
+                            if session.token == Nothing then
+                                Guest
+
+                            else
+                                Admin
+                    in
+                    ( { model
+                        | page = initPage model.route user
+                        , user = user
+                        , error = Nothing
+                      }
+                    , Cmd.none
+                    )
+
+                Err _ ->
+                    ( model, logout )
+
         ( GotError AuthError, _ ) ->
             ( model
-            , logout ()
+            , logout
             )
 
         ( GotError error, _ ) ->
@@ -118,7 +145,7 @@ update msg model =
 
         ( Logout, _ ) ->
             ( model
-            , logout ()
+            , logout
             )
 
         ( TopMsg msg, Top sub ) ->
@@ -146,25 +173,22 @@ update msg model =
             ( model, Cmd.none )
 
 
-initPage : String -> User -> Page
-initPage hash user =
-    case ( hash, user ) of
+initPage : Maybe Route -> User -> Page
+initPage route user =
+    case ( route, user ) of
         ( _, Guest ) ->
             Top Top.init
 
-        ( "", _ ) ->
+        ( Just Route.Top, _ ) ->
             MainPage Blank
 
-        ( "#", _ ) ->
-            MainPage Blank
-
-        ( "#page1", _ ) ->
+        ( Just Route.Page1, _ ) ->
             MainPage (Page1 Page1.init)
 
-        ( "#page2", _ ) ->
+        ( Just Route.Page2, _ ) ->
             MainPage (Page2 Page2.init)
 
-        _ ->
+        ( Nothing, _ ) ->
             NotFound
 
 
@@ -198,8 +222,8 @@ view model =
                     viewMainPage model page
 
 
-viewMainPage : Session a -> MainPage -> Html Msg
-viewMainPage session page =
+viewMainPage : Context a -> MainPage -> Html Msg
+viewMainPage context page =
     Template.headerAndMenu
         (Header.view Logout)
         Menu.view
@@ -212,7 +236,7 @@ viewMainPage session page =
                     |> Html.map Page1Msg
 
             Page2 sub ->
-                Page2.view session sub
+                Page2.view context sub
                     |> Html.map Page2Msg
         )
 
@@ -224,7 +248,7 @@ viewMainPage session page =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ hashchanges HashChanged
+        [ sessionChanges SessionChanged
         , case model.page of
             NotFound ->
                 Sub.none

@@ -45,14 +45,14 @@ update msg model =
 -- VIEW
 
 
-view : Session a -> Model -> Html Msg
-view session model =
+view : Context a -> Model -> Html Msg
+view { user } model =
     div []
         [ input
             [ placeholder "Text to reverse"
             , onInput Change
             , value model.content
-            , readonly (session.user == Guest)
+            , readonly (user == Guest)
             ]
             []
         , div [] [ text (String.reverse model.content) ]

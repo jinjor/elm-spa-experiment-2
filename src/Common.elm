@@ -1,6 +1,14 @@
 port module Common exposing (..)
 
+import Json.Decode
+import Json.Encode
+import Navigation
+import Route
 import Task exposing (Task)
+
+
+type alias Json =
+    Json.Encode.Value
 
 
 type User
@@ -8,9 +16,14 @@ type User
     | Admin
 
 
-type alias Session a =
+type alias Context a =
     { a
         | user : User
+    }
+
+
+type alias Session =
+    { token : Maybe String
     }
 
 
@@ -91,13 +104,28 @@ toTuple transformModel transformError transformMsg return =
 -- PORTS
 
 
-port hashchanges : (( String, Maybe String ) -> msg) -> Sub msg
+port sessionChanges : (Json -> msg) -> Sub msg
 
 
-port goto : String -> Cmd msg
+port setSession : Maybe Session -> Cmd msg
 
 
-port login : String -> Cmd msg
+login : String -> Cmd msg
+login token =
+    setSession (Just { token = Just token })
 
 
-port logout : () -> Cmd msg
+logout : Cmd msg
+logout =
+    Cmd.batch
+        [ setSession Nothing
+        , Navigation.modifyUrl (Route.toHash Route.Top)
+        ]
+
+
+decodeSession : Json.Decode.Decoder Session
+decodeSession =
+    Json.Decode.map Session
+        (Json.Decode.maybe (Json.Decode.field "token" Json.Decode.string))
+        |> Json.Decode.maybe
+        |> Json.Decode.map (Maybe.withDefault { token = Nothing })
