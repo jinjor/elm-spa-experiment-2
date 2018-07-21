@@ -1,19 +1,29 @@
-port module Main exposing (..)
+module Main exposing (..)
 
 import Common exposing (..)
+import Header
 import Html exposing (..)
+import Menu
 import Page1 exposing (..)
 import Page2 exposing (..)
+import Template
+import Top
 
 
-main : Program Never Model Msg
+main : Program Flags Model Msg
 main =
-    Html.program
+    Html.programWithFlags
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
         }
+
+
+type alias Flags =
+    { hash : String
+    , token : Maybe String
+    }
 
 
 
@@ -27,10 +37,21 @@ type alias Model =
     }
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( { user = Admin
-      , page = Top
+init : Flags -> ( Model, Cmd Msg )
+init { hash, token } =
+    let
+        user =
+            if token == Nothing then
+                Guest
+
+            else
+                Admin
+
+        page =
+            initPage hash user
+    in
+    ( { page = page
+      , user = user
       , error = Nothing
       }
     , Cmd.none
@@ -38,8 +59,13 @@ init =
 
 
 type Page
-    = Top
-    | NotFound
+    = NotFound
+    | Top Top.Model
+    | MainPage MainPage
+
+
+type MainPage
+    = Blank
     | Page1 Page1.Model
     | Page2 Page2.Model
 
@@ -49,8 +75,10 @@ type Page
 
 
 type Msg
-    = HashChanged String
+    = HashChanged ( String, Maybe String )
     | GotError Error
+    | Logout
+    | TopMsg Top.Msg
     | Page1Msg Page1.Msg
     | Page2Msg Page2.Msg
 
@@ -58,34 +86,29 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.page ) of
-        ( HashChanged hash, _ ) ->
-            (case hash of
-                "" ->
-                    ( Top, Cmd.none )
+        ( HashChanged ( hash, token ), _ ) ->
+            let
+                user =
+                    if token == Nothing then
+                        Guest
 
-                "#" ->
-                    ( Top, Cmd.none )
+                    else
+                        Admin
 
-                "#page1" ->
-                    ( Page1 Page1.init, Cmd.none )
-
-                "#page2" ->
-                    ( Page2 Page2.init, Cmd.none )
-
-                _ ->
-                    ( NotFound, Cmd.none )
+                page =
+                    initPage hash user
+            in
+            ( { model
+                | page = page
+                , user = user
+                , error = Nothing
+              }
+            , Cmd.none
             )
-                |> Tuple.mapFirst
-                    (\page ->
-                        { model
-                            | page = page
-                            , error = Nothing
-                        }
-                    )
 
         ( GotError AuthError, _ ) ->
             ( model
-            , goto ""
+            , logout ()
             )
 
         ( GotError error, _ ) ->
@@ -93,22 +116,56 @@ update msg model =
             , Cmd.none
             )
 
-        ( Page1Msg msg, Page1 sub ) ->
+        ( Logout, _ ) ->
+            ( model
+            , logout ()
+            )
+
+        ( TopMsg msg, Top sub ) ->
+            Top.update msg sub
+                |> toTuple
+                    (\sub -> { model | page = Top sub })
+                    GotError
+                    TopMsg
+
+        ( Page1Msg msg, MainPage (Page1 sub) ) ->
             Page1.update msg sub
                 |> toTuple
-                    (\sub -> { model | page = Page1 sub })
+                    (\sub -> { model | page = MainPage (Page1 sub) })
                     GotError
                     Page1Msg
 
-        ( Page2Msg msg, Page2 sub ) ->
+        ( Page2Msg msg, MainPage (Page2 sub) ) ->
             Page2.update msg sub
                 |> toTuple
-                    (\sub -> { model | page = Page2 sub })
+                    (\sub -> { model | page = MainPage (Page2 sub) })
                     GotError
                     Page2Msg
 
         _ ->
             ( model, Cmd.none )
+
+
+initPage : String -> User -> Page
+initPage hash user =
+    case ( hash, user ) of
+        ( _, Guest ) ->
+            Top Top.init
+
+        ( "", _ ) ->
+            MainPage Blank
+
+        ( "#", _ ) ->
+            MainPage Blank
+
+        ( "#page1", _ ) ->
+            MainPage (Page1 Page1.init)
+
+        ( "#page2", _ ) ->
+            MainPage (Page2 Page2.init)
+
+        _ ->
+            NotFound
 
 
 
@@ -119,23 +176,45 @@ view : Model -> Html Msg
 view model =
     case model.error of
         Just err ->
-            text (toString err)
+            Template.headerOnly
+                Header.empty
+                (text (toString err))
 
         Nothing ->
             case model.page of
-                Top ->
-                    text "top"
-
                 NotFound ->
-                    text "not found"
+                    Template.headerOnly
+                        Header.empty
+                        (text "not found")
 
-                Page1 sub ->
-                    Page1.view sub
-                        |> Html.map Page1Msg
+                Top sub ->
+                    Template.headerOnly
+                        Header.empty
+                        (Top.view sub
+                            |> Html.map TopMsg
+                        )
 
-                Page2 sub ->
-                    Page2.view model sub
-                        |> Html.map Page2Msg
+                MainPage page ->
+                    viewMainPage model page
+
+
+viewMainPage : Session a -> MainPage -> Html Msg
+viewMainPage session page =
+    Template.headerAndMenu
+        (Header.view Logout)
+        Menu.view
+        (case page of
+            Blank ->
+                text ""
+
+            Page1 sub ->
+                Page1.view sub
+                    |> Html.map Page1Msg
+
+            Page2 sub ->
+                Page2.view session sub
+                    |> Html.map Page2Msg
+        )
 
 
 
@@ -147,27 +226,21 @@ subscriptions model =
     Sub.batch
         [ hashchanges HashChanged
         , case model.page of
-            Top ->
-                Sub.none
-
             NotFound ->
                 Sub.none
 
-            Page1 sub ->
+            Top sub ->
+                Top.subscriptions sub
+                    |> Sub.map TopMsg
+
+            MainPage Blank ->
+                Sub.none
+
+            MainPage (Page1 sub) ->
                 Page1.subscriptions sub
                     |> Sub.map Page1Msg
 
-            Page2 sub ->
+            MainPage (Page2 sub) ->
                 Page2.subscriptions sub
                     |> Sub.map Page2Msg
         ]
-
-
-
--- PORTS
-
-
-port hashchanges : (String -> msg) -> Sub msg
-
-
-port goto : String -> Cmd msg

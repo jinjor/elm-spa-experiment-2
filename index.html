@@ -8,19 +8,31 @@
 	</style>
 </head>
 <body>
-<a href="#page1">Counter</a>
-<a href="#page2">Text Field</a>
 <div id="page"></div>
 <script src="./elm.js"></script>
 <script type="text/javascript">
-	const app = Elm.Main.embed(document.getElementById('page'));
+	const app = Elm.Main.embed(document.getElementById('page'), {
+		hash: location.hash,
+		token: localStorage.getItem("token")
+	});
 	window.onhashchange = sendHash;
 	setTimeout(sendHash);
 	function sendHash() {
-		app.ports.hashchanges.send(location.hash);
+		const token = localStorage.getItem("token");
+		app.ports.hashchanges.send([location.hash, token]);
 	}
 	app.ports.goto.subscribe(hash => {
 		location.hash = hash;
+		sendHash();
+	});
+	app.ports.login.subscribe(token => {
+		localStorage.setItem("token", token);
+		location.hash = "";
+		sendHash();
+	});
+	app.ports.logout.subscribe(() => {
+		localStorage.removeItem("token");
+		location.hash = "";
 		sendHash();
 	});
 </script>

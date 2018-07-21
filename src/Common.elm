@@ -1,4 +1,4 @@
-module Common exposing (..)
+port module Common exposing (..)
 
 import Task exposing (Task)
 
@@ -28,6 +28,11 @@ badRequest =
 badAuth : Task Error ()
 badAuth =
     Task.fail AuthError
+
+
+getToken : Task Error String
+getToken =
+    Task.succeed "token"
 
 
 
@@ -80,3 +85,19 @@ toTuple transformModel transformError transformMsg return =
             ++ List.map (Cmd.map transformMsg) return.commands
         )
     )
+
+
+
+-- PORTS
+
+
+port hashchanges : (( String, Maybe String ) -> msg) -> Sub msg
+
+
+port goto : String -> Cmd msg
+
+
+port login : String -> Cmd msg
+
+
+port logout : () -> Cmd msg
