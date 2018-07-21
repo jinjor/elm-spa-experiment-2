@@ -19,6 +19,10 @@
 	function sendHash() {
 		app.ports.hashchanges.send(location.hash);
 	}
+	app.ports.goto.subscribe(hash => {
+		location.hash = hash;
+		sendHash();
+	});
 </script>
 </body>
 </html>

@@ -14,13 +14,20 @@ type alias Session a =
     }
 
 
-type alias Error =
-    String
+type Error
+    = NetworkError
+    | AuthError
+    | Bug
 
 
 badRequest : Task Error ()
 badRequest =
-    Task.fail "bad request"
+    Task.fail Bug
+
+
+badAuth : Task Error ()
+badAuth =
+    Task.fail AuthError
 
 
 

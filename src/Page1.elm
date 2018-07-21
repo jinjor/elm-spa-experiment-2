@@ -1,7 +1,9 @@
 module Page1 exposing (..)
 
+import Common exposing (..)
 import Html exposing (..)
 import Html.Events exposing (..)
+import Task
 
 
 
@@ -24,16 +26,21 @@ init =
 type Msg
     = Increment
     | Decrement
+    | GotSomething ()
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> Return Model Msg
 update msg model =
     case msg of
         Increment ->
-            ( model + 1, Cmd.none )
+            return (model + 1)
+                |> withTask (Task.map GotSomething badAuth)
 
         Decrement ->
-            ( model - 1, Cmd.none )
+            return (model - 1)
+
+        GotSomething _ ->
+            return model
 
 
 

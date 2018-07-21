@@ -30,7 +30,7 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
     ( { user = Admin
-      , page = Blank
+      , page = Top
       , error = Nothing
       }
     , Cmd.none
@@ -38,7 +38,7 @@ init =
 
 
 type Page
-    = Blank
+    = Top
     | NotFound
     | Page1 Page1.Model
     | Page2 Page2.Model
@@ -61,10 +61,10 @@ update msg model =
         ( HashChanged hash, _ ) ->
             (case hash of
                 "" ->
-                    ( Blank, Cmd.none )
+                    ( Top, Cmd.none )
 
                 "#" ->
-                    ( Blank, Cmd.none )
+                    ( Top, Cmd.none )
 
                 "#page1" ->
                     ( Page1 Page1.init, Cmd.none )
@@ -79,8 +79,14 @@ update msg model =
                     (\page ->
                         { model
                             | page = page
+                            , error = Nothing
                         }
                     )
+
+        ( GotError AuthError, _ ) ->
+            ( model
+            , goto ""
+            )
 
         ( GotError error, _ ) ->
             ( { model | error = Just error }
@@ -89,8 +95,10 @@ update msg model =
 
         ( Page1Msg msg, Page1 sub ) ->
             Page1.update msg sub
-                |> Tuple.mapFirst (\sub -> { model | page = Page1 sub })
-                |> Tuple.mapSecond (Cmd.map Page1Msg)
+                |> toTuple
+                    (\sub -> { model | page = Page1 sub })
+                    GotError
+                    Page1Msg
 
         ( Page2Msg msg, Page2 sub ) ->
             Page2.update msg sub
@@ -111,12 +119,12 @@ view : Model -> Html Msg
 view model =
     case model.error of
         Just err ->
-            text err
+            text (toString err)
 
         Nothing ->
             case model.page of
-                Blank ->
-                    text ""
+                Top ->
+                    text "top"
 
                 NotFound ->
                     text "not found"
@@ -139,7 +147,7 @@ subscriptions model =
     Sub.batch
         [ hashchanges HashChanged
         , case model.page of
-            Blank ->
+            Top ->
                 Sub.none
 
             NotFound ->
@@ -160,3 +168,6 @@ subscriptions model =
 
 
 port hashchanges : (String -> msg) -> Sub msg
+
+
+port goto : String -> Cmd msg
